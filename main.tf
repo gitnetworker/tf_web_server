@@ -1,6 +1,17 @@
+terraform {
+  cloud {
+
+    organization = "CLOUD_27"
+
+    workspaces {
+      name = "tf_web_server"
+    }
+  }
+}
+
 ##Defines the cloud provider (AWS) and its region where resources will be deployed.
 provider "aws" {
-  region = "us-east-1"  # Specify the AWS region for your resources
+  region = "us-east-1" # Specify the AWS region for your resources
 }
 
 # Define common variables
@@ -25,9 +36,9 @@ variable "instance_count" {
 ##vpc_name, subnet_name, sg_name: Names for the VPC, subnet, and security group.
 locals {
   instance_names = [for idx in range(var.instance_count) : "${var.prefix}-instance-${idx + 1}"]
-  vpc_name        = "${var.prefix}-vpc"
-  subnet_name     = "${var.prefix}-subnet"
-  sg_name          = "${var.prefix}-sg"
+  vpc_name       = "${var.prefix}-vpc"
+  subnet_name    = "${var.prefix}-subnet"
+  sg_name        = "${var.prefix}-sg"
 }
 
 # Define SSH key pair
@@ -42,7 +53,7 @@ resource "aws_key_pair" "deployer" {
 # Set up VPC and networking components
 ##aws_vpc: Defines a Virtual Private Cloud (VPC) with a CIDR block of 10.0.0.0/16.
 resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"  # Updated CIDR block for VPC
+  cidr_block = "10.0.0.0/16" # Updated CIDR block for VPC
   tags = {
     Name = local.vpc_name
   }
@@ -56,7 +67,7 @@ resource "aws_internet_gateway" "main" {
 ##aws_subnet: Defines a subnet within the VPC with a CIDR block of 10.0.1.0/24.
 resource "aws_subnet" "main" {
   vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"  # Updated CIDR block for subnet
+  cidr_block = "10.0.1.0/24" # Updated CIDR block for subnet
   tags = {
     Name = local.subnet_name
   }
@@ -82,7 +93,7 @@ resource "aws_route_table_association" "main" {
 resource "aws_security_group" "web" {
   vpc_id = aws_vpc.main.id
 
-##ingress: Rules allowing SSH (port 22), HTTP (port 80), and HTTPS (port 443) traffic.
+  ##ingress: Rules allowing SSH (port 22), HTTP (port 80), and HTTPS (port 443) traffic.
   ingress {
     from_port   = 22
     to_port     = 22
@@ -107,7 +118,7 @@ resource "aws_security_group" "web" {
     description = "Allow HTTPS access"
   }
 
-##egress: Allows all outbound traffic.
+  ##egress: Allows all outbound traffic.
   egress {
     from_port   = 0
     to_port     = 0
@@ -125,12 +136,12 @@ resource "aws_security_group" "web" {
 ##aws_instance: Creates EC2 instances based on the count specified.
 resource "aws_instance" "server" {
   count                  = var.instance_count
-  ami                    = "ami-0182f373e66f89c85"  # Replace with your AMI ID
+  ami                    = "ami-0182f373e66f89c85" # Replace with your AMI ID
   instance_type          = "t2.micro"
   key_name               = aws_key_pair.deployer.key_name
   subnet_id              = aws_subnet.main.id
   vpc_security_group_ids = [aws_security_group.web.id]
-  
+
   user_data = <<-EOF
                      #!/bin/bash
                      sudo yum update -y
@@ -140,12 +151,12 @@ resource "aws_instance" "server" {
                      echo "<h1>Hello from ${local.instance_names[count.index]}</h1>" | sudo tee /var/www/html/index.html
   EOF
 
-##Assigns a unique name to each instance based on local.instance_names.
+  ##Assigns a unique name to each instance based on local.instance_names.
   tags = {
     Name = local.instance_names[count.index]
   }
 
-##Ensures that the instance is created before destroying the old one.
+  ##Ensures that the instance is created before destroying the old one.
   lifecycle {
     create_before_destroy = true
   }
